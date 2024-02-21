@@ -1,0 +1,4 @@
+storage_account_name = "demoair40399"
+container_name = "terraform-state"
+key = "terraform.tfstate"
+sas_token = "?sv=2017-07-29&ss=b&srt=sco&sp=rwdlac&se=2023-01-10T09:36:45Z&st=2021-01-10T09:36:45Z&spr=https&sig=ktcMMhQC%2BHlwYy3PvRKdADJYImZDik8aFLVpEz2kT1Y%3D"

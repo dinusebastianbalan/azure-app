@@ -1,0 +1,38 @@
+trigger:
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - WebApp
+
+
+pool:
+  name: Azure Pipelines
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: CopyFiles@2
+  displayName: 'Copy Files to: $(build.artifactstagingdirectory)'
+  inputs:
+    SourceFolder: WebApp
+    TargetFolder: '$(build.artifactstagingdirectory)'
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact: drop'
+
+- bash: 'az login --service-principal --username $(auth.user) --password $(auth.pass) --tenant $(tenant); dir; cd WebApp; az acr build --image webfrontend:v5 -r demoairACR --file Dockerfile .'
+  displayName: 'Bash Script'
+
+- task: HelmDeploy@0
+  displayName: 'Deploy new app version'
+  inputs:
+    connectionType: 'Azure Resource Manager'
+    azureSubscription: 'Free Trial(9566130f-dc85-4633-a05c-6ea20f658775)'
+    azureResourceGroup: 'demo_air_rg'
+    kubernetesCluster: 'demoair-aks'
+    command: 'upgrade'
+    chartType: 'Name'
+    chartName: 'Helm/app-webfrontend/'
+    releaseName: 'webfrontend'
+    valueFile: 'Helm/app-webfrontend/values.yaml'

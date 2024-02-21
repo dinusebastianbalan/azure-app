@@ -1,0 +1,139 @@
+parameters:
+  - name: vmImage
+    type: string
+    default: ubuntu-20.04
+    values:
+    - ubuntu-20.04
+    
+  - name: subscription
+    type: string
+    displayName: "Subscription"    
+    default: 'Free Trial(9566130f-dc85-4633-a05c-6ea20f658775)'
+    values:
+    - 'Free Trial(9566130f-dc85-4633-a05c-6ea20f658775)'
+
+  - name: kubernetesCluster
+    displayName: "Cluster"
+    type: string
+    default: "demoair-aks"
+    values:
+    - demoair-aks
+
+  - name: azureResourceGroup
+    displayName: "Resource Group"  
+    type: string
+    default: demo_air_rg
+    values:
+    - "demo_air_rg"
+  
+  - name: KubeServiceConnection
+    displayName: "Service Connection for Kubernetes"  
+    type: string
+    default: "SC-AKS-DemoAIR-DefaultNS"
+    values:
+    - "SC-AKS-DemoAIR-DefaultNS"
+
+trigger: none
+
+pool:
+  name: Azure Pipelines
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: HelmDeploy@0
+  displayName: 'Install NGINX ingress'
+  inputs:
+    connectionType: 'Azure Resource Manager'
+    azureSubscription: '${{ parameters.subscription }}'
+    azureResourceGroup: '${{ parameters.azureResourceGroup }}'
+    kubernetesCluster: '${{ parameters.kubernetesCluster }}'
+    namespace: 'default'
+    command: 'upgrade'
+    chartType: 'FilePath'
+    chartPath: 'Helm/nginx-ingress-controller'
+    releaseName: 'application-ingress'
+    valueFile: 'Helm/nginx-ingress-controller/values.yaml'
+
+
+- task: HelmDeploy@0
+  displayName: 'Install rabbitmq'
+  inputs:
+    azureSubscription: '${{ parameters.subscription }}'
+    azureResourceGroup: ${{ parameters.azureResourceGroup }}
+    kubernetesCluster: ${{ parameters.kubernetesCluster }}
+    namespace: default
+    command: upgrade
+    chartType: FilePath
+    chartPath: Helm/rabbitmq
+    releaseName: rabbitmq
+    overrideValues: 'auth.password=$(auth.password) --set auth.erlangCookie=$(auth.erlangCookie)'
+    valueFile: 'Helm/rabbitmq/values.yaml'
+
+- task: HelmDeploy@0
+  displayName: 'Install prometheus'
+  inputs:
+    connectionType: 'Azure Resource Manager'
+    azureSubscription: '${{ parameters.subscription }}'
+    azureResourceGroup: '${{ parameters.azureResourceGroup }}'
+    kubernetesCluster: '${{ parameters.kubernetesCluster }}'
+    useClusterAdmin: true
+    command: 'upgrade'
+    chartType: 'FilePath'
+    chartPath: 'Helm/prometheus'
+    releaseName: 'prometheus'
+    valueFile: 'Helm/prometheus/values.yaml'
+    waitForExecution: false
+    
+- task: HelmDeploy@0
+  displayName: 'Install Grafana'
+  inputs:
+    connectionType: 'Azure Resource Manager'
+    azureSubscription: '${{ parameters.subscription }}'
+    azureResourceGroup: '${{ parameters.azureResourceGroup }}'
+    kubernetesCluster: '${{ parameters.kubernetesCluster }}'
+    useClusterAdmin: true
+    command: 'upgrade'
+    chartType: 'FilePath'
+    chartPath: 'Helm/grafana'
+    releaseName: 'grafana'
+    valueFile: 'Helm/grafana/values.yaml'
+    waitForExecution: false
+    overrideValues: 'smtp.user=$(user) --set smtp.password=$(pass)'
+
+- task: Kubernetes@1
+  displayName: 'Apply ingress routing'
+  inputs:
+    kubernetesServiceEndpoint: ${{ parameters.KubeServiceConnection }}
+    namespace: default
+    command: apply
+    useConfigurationFile: true
+    configuration: 'Helm/infrastructure-ingress-routing/ingress-resources.yaml'
+
+
+
+- task: Kubernetes@1
+  displayName: 'kubectl create SecretProviderClass'
+  inputs:
+    kubernetesServiceEndpoint: ${{ parameters.KubeServiceConnection }}
+    namespace: default
+    command: apply
+    useConfigurationFile: true
+    configuration: 'Helm/keyvault/secret-class.yaml'
+
+- task: Kubernetes@1
+  displayName: 'kubectl apply Identity binding'
+  inputs:
+    kubernetesServiceEndpoint: ${{ parameters.KubeServiceConnection }}
+    namespace: default
+    command: apply
+    useConfigurationFile: true
+    configuration: 'Helm/keyvault/aadpodidentity.yaml'
+
+- task: Kubernetes@1
+  displayName: 'kubectl apply Nginx pod for test'
+  inputs:
+    kubernetesServiceEndpoint: ${{ parameters.KubeServiceConnection }}
+    namespace: default
+    command: apply
+    useConfigurationFile: true
+    configuration: 'Helm/keyvault/nginx-pod-secrets-store-inline-podid.yaml'

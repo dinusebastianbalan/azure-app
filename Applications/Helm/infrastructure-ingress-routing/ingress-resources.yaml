@@ -1,0 +1,22 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: infrastructure-ingress-routing
+  annotations:
+    ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          serviceName: rabbitmq
+          servicePort: 15672
+        path: /rabbitmq
+      - backend:
+          serviceName: grafana
+          servicePort: 3000
+        path: /grafana
+      - backend:
+          serviceName: webfrontend
+          servicePort: 80
+        path: /

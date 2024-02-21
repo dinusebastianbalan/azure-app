@@ -1,0 +1,16 @@
+apiVersion: "aadpodidentity.k8s.io/v1"
+kind: AzureIdentity
+metadata:
+  name: aksidentity
+spec:
+  type: 0
+  resourceID: /subscriptions/9566130f-dc85-4633-a05c-6ea20f658775/resourcegroups/demo_air_rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/aksidentity
+  clientID: 21ed2bc7-417c-4500-be83-8f411e00ba49
+---
+apiVersion: "aadpodidentity.k8s.io/v1"
+kind: AzureIdentityBinding
+metadata:
+  name: azurebiding
+spec:
+  azureIdentity: aksidentity
+  selector: azure-kv
